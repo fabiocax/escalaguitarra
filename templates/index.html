@@ -1,4 +1,3 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -429,37 +428,80 @@
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Elementos DOM
-            const fretboardEl = document.getElementById('fretboard');
-            const displayModeEl = document.getElementById('display-mode');
-            const rootNoteEl = document.getElementById('root-note');
-            const scaleTypeEl = document.getElementById('scale-type');
-            const chordTypeEl = document.getElementById('chord-type');
-            const scaleTypeGroupEl = document.getElementById('scale-type-group');
-            const chordTypeGroupEl = document.getElementById('chord-type-group');
-            const updateButtonEl = document.getElementById('update-button');
-            const displayToggleEl = document.getElementById('display-toggle');
-            const intervalsLegendEl = document.getElementById('intervals-legend');
-            
-            // Afinação padrão da guitarra (do agudo para o grave)
-            const standardTuning = ['E', 'B', 'G', 'D', 'A', 'E'];
-            
-            // Número de trastes a serem exibidos
-            const numFrets = 12;
-            
-            // Dados do braço
-            let fretboardData = [];
-            let fretboardIntervalsData = [];
-            let scaleData = { notes: [], intervals: [] };
-            let chordData = { notes: [], intervals: [] };
-            let scaleTriads = [];
-            let allTriads = {};
-            let currentTriadIndex = 0;
-            let currentTriadType = '';
-            let showNotation = 'notes'; // 'notes' ou 'intervals'
-            
-            // Inicializar o braço da guitarra
+        // Definições globais
+        const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        // Afinação padrão da guitarra (do agudo para o grave)
+        const STANDARD_TUNING = ['E', 'B', 'G', 'D', 'A', 'E'];
+        
+        // Quantidade de trastes a serem exibidos
+        const NUM_FRETS = 12;
+        
+        // Definição de intervalos
+        const INTERVAL_NAMES = {
+            0: '1P', // Primeira Justa/Uníssono
+            1: '2m', // Segunda menor
+            2: '2M', // Segunda Maior
+            3: '3m', // Terça menor
+            4: '3M', // Terça Maior
+            5: '4P', // Quarta Justa
+            6: 'Tr', // Trítono
+            7: '5P', // Quinta Justa
+            8: '6m', // Sexta menor
+            9: '6M', // Sexta Maior
+            10: '7m', // Sétima menor
+            11: '7M', // Sétima Maior
+        };
+        
+        // Definição de escalas
+        const SCALES = {
+            'major': [0, 2, 4, 5, 7, 9, 11],
+            'minor': [0, 2, 3, 5, 7, 8, 10],
+            'pentatonic_major': [0, 2, 4, 7, 9],
+            'pentatonic_minor': [0, 3, 5, 7, 10],
+            'blues': [0, 3, 5, 6, 7, 10]
+        };
+        
+        // Definição de acordes
+        const CHORDS = {
+            'major': [0, 4, 7],
+            'minor': [0, 3, 7],
+            'dim': [0, 3, 6],
+            'aug': [0, 4, 8],
+            '7': [0, 4, 7, 10],
+            'maj7': [0, 4, 7, 11],
+            'm7': [0, 3, 7, 10],
+            'm7b5': [0, 3, 6, 10]
+        };
+        
+        // Elementos DOM
+        const fretboardEl = document.getElementById('fretboard');
+        const displayModeEl = document.getElementById('display-mode');
+        const rootNoteEl = document.getElementById('root-note');
+        const scaleTypeEl = document.getElementById('scale-type');
+        const chordTypeEl = document.getElementById('chord-type');
+        const scaleTypeGroupEl = document.getElementById('scale-type-group');
+        const chordTypeGroupEl = document.getElementById('chord-type-group');
+        const updateButtonEl = document.getElementById('update-button');
+        const displayToggleEl = document.getElementById('display-toggle');
+        const intervalsLegendEl = document.getElementById('intervals-legend');
+        const triadsInfoEl = document.getElementById('triads-info');
+        const allTriadsInfoEl = document.getElementById('all-triads-info');
+        
+        // Estado da aplicação
+        let fretboardData = [];
+        let fretboardIntervalsData = [];
+        let scaleData = { notes: [], intervals: [] };
+        let chordData = { notes: [], intervals: [] };
+        let scaleTriads = [];
+        let allTriads = {};
+        let currentTriadIndex = 0;
+        let currentTriadType = '';
+        let showNotation = 'notes'; // 'notes' ou 'intervals'
+        
+        // Inicialização
+        function init() {
+            // Inicializar braço
             initFretboard();
             
             // Event listeners
@@ -480,533 +522,721 @@
             // Inicializar controles
             updateControlsVisibility();
             
-            // Carregar dados iniciais
-            fetchFretboardData();
+            // Gerar dados do braço
+            generateFretboardData();
             
-            function updateControlsVisibility() {
-                const mode = displayModeEl.value;
-                const triadsInfoEl = document.getElementById('triads-info');
-                const allTriadsInfoEl = document.getElementById('all-triads-info');
+            // Atualizar visualização
+            updateFretboard();
+        }
+        
+        // Gera os dados do braço da guitarra
+        function generateFretboardData() {
+            fretboardData = [];
+            
+            // Para cada corda
+            for (let stringIdx = 0; stringIdx < STANDARD_TUNING.length; stringIdx++) {
+                const string = [];
+                const openNote = STANDARD_TUNING[stringIdx];
+                const openNoteIdx = NOTES.indexOf(openNote);
                 
-                // Mostrar/esconder controles baseado no modo
-                if (mode === 'scale') {
-                    scaleTypeGroupEl.style.display = 'flex';
-                    chordTypeGroupEl.style.display = 'none';
-                    triadsInfoEl.style.display = 'none';
-                    allTriadsInfoEl.style.display = 'none';
-                    intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
-                } else if (mode === 'chord') {
-                    scaleTypeGroupEl.style.display = 'none';
-                    chordTypeGroupEl.style.display = 'flex';
-                    triadsInfoEl.style.display = 'none';
-                    allTriadsInfoEl.style.display = 'none';
-                    intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
-                } else if (mode === 'scale-triads') {
-                    scaleTypeGroupEl.style.display = 'flex';
-                    chordTypeGroupEl.style.display = 'none';
-                    triadsInfoEl.style.display = 'block';
-                    allTriadsInfoEl.style.display = 'none';
-                    intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
-                } else if (mode === 'all-triads') {
-                    scaleTypeGroupEl.style.display = 'none';
-                    chordTypeGroupEl.style.display = 'none';
-                    triadsInfoEl.style.display = 'none';
-                    allTriadsInfoEl.style.display = 'block';
-                    intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
-                } else if (mode === 'intervals') {
-                    scaleTypeGroupEl.style.display = 'none';
-                    chordTypeGroupEl.style.display = 'none';
-                    triadsInfoEl.style.display = 'none';
-                    allTriadsInfoEl.style.display = 'none';
-                    intervalsLegendEl.style.display = 'flex';
-                } else {
-                    scaleTypeGroupEl.style.display = 'none';
-                    chordTypeGroupEl.style.display = 'none';
-                    triadsInfoEl.style.display = 'none';
-                    allTriadsInfoEl.style.display = 'none';
-                    intervalsLegendEl.style.display = 'none';
+                // Para cada traste
+                for (let fret = 0; fret <= NUM_FRETS; fret++) {
+                    const noteIdx = (openNoteIdx + fret) % NOTES.length;
+                    const note = NOTES[noteIdx];
+                    
+                    string.push({
+                        note: note,
+                        string: stringIdx + 1, // String começa em 1
+                        fret: fret
+                    });
                 }
+                
+                fretboardData.push(string);
             }
             
-            function initFretboard() {
-                // Limpar o braço
-                fretboardEl.innerHTML = '';
+            // Gera também os dados de intervalos
+            generateIntervalsData(rootNoteEl.value);
+        }
+        
+        // Gera dados de intervalos
+        function generateIntervalsData(root) {
+            fretboardIntervalsData = [];
+            const rootIdx = NOTES.indexOf(root);
+            
+            // Para cada corda
+            for (let stringIdx = 0; stringIdx < STANDARD_TUNING.length; stringIdx++) {
+                const string = [];
+                const openNote = STANDARD_TUNING[stringIdx];
+                const openNoteIdx = NOTES.indexOf(openNote);
                 
-                // Criar cada corda
-                for (let i = 0; i < standardTuning.length; i++) {
-                    const stringEl = document.createElement('div');
-                    stringEl.className = 'string';
+                // Para cada traste
+                for (let fret = 0; fret <= NUM_FRETS; fret++) {
+                    const noteIdx = (openNoteIdx + fret) % NOTES.length;
+                    const note = NOTES[noteIdx];
                     
-                    // Adicionar nome da corda
-                    const stringNameEl = document.createElement('div');
-                    stringNameEl.className = 'string-name';
-                    stringNameEl.textContent = standardTuning[i];
-                    stringEl.appendChild(stringNameEl);
+                    // Calcular intervalo
+                    const interval = (noteIdx - rootIdx + 12) % 12;
+                    const intervalName = INTERVAL_NAMES[interval];
                     
-                    // Adicionar trastes
-                    for (let j = 0; j <= numFrets; j++) {
-                        const fretEl = document.createElement('div');
-                        fretEl.className = 'fret';
-                        fretEl.dataset.string = i + 1;
-                        fretEl.dataset.fret = j;
-                        
-                        // Adicionar número do traste na primeira corda
-                        if (i === 0) {
-                            const fretNumberEl = document.createElement('div');
-                            fretNumberEl.className = 'fret-number';
-                            fretNumberEl.textContent = j;
-                            fretEl.appendChild(fretNumberEl);
-                        }
-                        
-                        stringEl.appendChild(fretEl);
+                    string.push({
+                        note: note,
+                        string: stringIdx + 1,
+                        fret: fret,
+                        interval: interval,
+                        interval_name: intervalName
+                    });
+                }
+                
+                fretboardIntervalsData.push(string);
+            }
+        }
+        
+        // Cria o braço da guitarra no DOM
+        function initFretboard() {
+            // Limpar braço
+            fretboardEl.innerHTML = '';
+            
+            // Criar cada corda
+            for (let i = 0; i < STANDARD_TUNING.length; i++) {
+                const stringEl = document.createElement('div');
+                stringEl.className = 'string';
+                
+                // Adicionar nome da corda
+                const stringNameEl = document.createElement('div');
+                stringNameEl.className = 'string-name';
+                stringNameEl.textContent = STANDARD_TUNING[i];
+                stringEl.appendChild(stringNameEl);
+                
+                // Adicionar trastes
+                for (let j = 0; j <= NUM_FRETS; j++) {
+                    const fretEl = document.createElement('div');
+                    fretEl.className = 'fret';
+                    fretEl.dataset.string = i + 1;
+                    fretEl.dataset.fret = j;
+                    
+                    // Adicionar número do traste na primeira corda
+                    if (i === 0) {
+                        const fretNumberEl = document.createElement('div');
+                        fretNumberEl.className = 'fret-number';
+                        fretNumberEl.textContent = j;
+                        fretEl.appendChild(fretNumberEl);
                     }
                     
-                    fretboardEl.appendChild(stringEl);
+                    stringEl.appendChild(fretEl);
+                }
+                
+                fretboardEl.appendChild(stringEl);
+            }
+        }
+        
+        // Atualiza visibilidade dos controles
+        function updateControlsVisibility() {
+            const mode = displayModeEl.value;
+            
+            // Mostrar/esconder controles baseado no modo
+            if (mode === 'scale' || mode === 'scale-triads') {
+                scaleTypeGroupEl.style.display = 'flex';
+                chordTypeGroupEl.style.display = 'none';
+                triadsInfoEl.style.display = mode === 'scale-triads' ? 'block' : 'none';
+                allTriadsInfoEl.style.display = 'none';
+                intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
+            } else if (mode === 'chord') {
+                scaleTypeGroupEl.style.display = 'none';
+                chordTypeGroupEl.style.display = 'flex';
+                triadsInfoEl.style.display = 'none';
+                allTriadsInfoEl.style.display = 'none';
+                intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
+            } else if (mode === 'all-triads') {
+                scaleTypeGroupEl.style.display = 'none';
+                chordTypeGroupEl.style.display = 'none';
+                triadsInfoEl.style.display = 'none';
+                allTriadsInfoEl.style.display = 'block';
+                intervalsLegendEl.style.display = showNotation === 'intervals' ? 'flex' : 'none';
+            } else if (mode === 'intervals') {
+                scaleTypeGroupEl.style.display = 'none';
+                chordTypeGroupEl.style.display = 'none';
+                triadsInfoEl.style.display = 'none';
+                allTriadsInfoEl.style.display = 'none';
+                intervalsLegendEl.style.display = 'flex';
+            } else {
+                scaleTypeGroupEl.style.display = 'none';
+                chordTypeGroupEl.style.display = 'none';
+                triadsInfoEl.style.display = 'none';
+                allTriadsInfoEl.style.display = 'none';
+                intervalsLegendEl.style.display = 'none';
+            }
+        }
+        
+        // Atualiza o braço
+        function updateFretboard() {
+            // Limpar notas existentes
+            document.querySelectorAll('.note').forEach(el => el.remove());
+            
+            // Obter modo atual
+            const mode = displayModeEl.value;
+            const rootNote = rootNoteEl.value;
+            
+            // Atualizar dados de intervalos
+            generateIntervalsData(rootNote);
+            
+            // Gerar e exibir dados com base no modo
+            if (mode === 'scale') {
+                generateScaleData(rootNote, scaleTypeEl.value);
+                renderNotes();
+            } else if (mode === 'chord') {
+                generateChordData(rootNote, chordTypeEl.value);
+                renderNotes();
+            } else if (mode === 'scale-triads') {
+                generateScaleData(rootNote, scaleTypeEl.value);
+                generateScaleTriads(rootNote, scaleTypeEl.value);
+                renderScaleTriads();
+            } else if (mode === 'all-triads') {
+                generateAllTriads(rootNote);
+                renderAllTriads();
+            } else if (mode === 'intervals') {
+                renderIntervals();
+            } else {
+                // Modo de todas as notas
+                renderNotes();
+            }
+        }
+        
+        // Gera dados de escala
+        function generateScaleData(root, scaleType) {
+            const rootIdx = NOTES.indexOf(root);
+            const scaleIntervals = SCALES[scaleType] || SCALES.major;
+            
+            let notes = [];
+            let intervals = [];
+            
+            for (const interval of scaleIntervals) {
+                const noteIdx = (rootIdx + interval) % 12;
+                const note = NOTES[noteIdx];
+                
+                notes.push(note);
+                intervals.push({
+                    interval: interval,
+                    interval_name: INTERVAL_NAMES[interval],
+                    note: note
+                });
+            }
+            
+            scaleData = {
+                notes: notes,
+                intervals: intervals
+            };
+        }
+        
+        // Gera dados de acorde
+        function generateChordData(root, chordType) {
+            const rootIdx = NOTES.indexOf(root);
+            const chordIntervals = CHORDS[chordType] || CHORDS.major;
+            
+            let notes = [];
+            let intervals = [];
+            
+            for (const interval of chordIntervals) {
+                const noteIdx = (rootIdx + interval) % 12;
+                const note = NOTES[noteIdx];
+                
+                notes.push(note);
+                intervals.push({
+                    interval: interval,
+                    interval_name: INTERVAL_NAMES[interval],
+                    note: note
+                });
+            }
+            
+            chordData = {
+                notes: notes,
+                intervals: intervals
+            };
+        }
+        
+        // Gera dados de tríades da escala
+        function generateScaleTriads(root, scaleType) {
+            // Primeiro gera dados da escala se ainda não existirem
+            if (!scaleData.notes.length) {
+                generateScaleData(root, scaleType);
+            }
+            
+            const scaleNotes = scaleData.notes;
+            const triads = [];
+            
+            // Determina os tipos de tríade com base no tipo de escala
+            let triadTypes = [];
+            if (scaleType === 'major') {
+                triadTypes = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'dim'];
+            } else if (scaleType === 'minor') {
+                triadTypes = ['minor', 'dim', 'major', 'minor', 'minor', 'major', 'major'];
+            } else {
+                // Para outros tipos de escala, determina os tipos de acordo com os intervalos
+                for (let i = 0; i < scaleNotes.length; i++) {
+                    // Pega as notas da tríade
+                    const rootNote = scaleNotes[i];
+                    const thirdIdx = (i + 2) % scaleNotes.length;
+                    const fifthIdx = (i + 4) % scaleNotes.length;
+                    
+                    const thirdNote = scaleNotes[thirdIdx];
+                    const fifthNote = scaleNotes[fifthIdx];
+                    
+                    // Calcula intervalos
+                    const rootIdx = NOTES.indexOf(rootNote);
+                    const thirdNoteIdx = NOTES.indexOf(thirdNote);
+                    const fifthNoteIdx = NOTES.indexOf(fifthNote);
+                    
+                    const thirdInterval = (thirdNoteIdx - rootIdx + 12) % 12;
+                    const fifthInterval = (fifthNoteIdx - rootIdx + 12) % 12;
+                    
+                    // Determina o tipo de tríade
+                    let triadType;
+                    if (thirdInterval === 4 && fifthInterval === 7) {
+                        triadType = 'major';
+                    } else if (thirdInterval === 3 && fifthInterval === 7) {
+                        triadType = 'minor';
+                    } else if (thirdInterval === 3 && fifthInterval === 6) {
+                        triadType = 'dim';
+                    } else if (thirdInterval === 4 && fifthInterval === 8) {
+                        triadType = 'aug';
+                    } else {
+                        triadType = 'unknown';
+                    }
+                    
+                    triadTypes.push(triadType);
                 }
             }
             
-            function fetchFretboardData() {
-                fetch('/api/fretboard')
-                    .then(response => response.json())
-                    .then(data => {
-                        fretboardData = data;
-                        
-                        // Também carrega os dados de intervalos
-                        fetchFretboardIntervalsData(rootNoteEl.value);
-                    })
-                    .catch(error => console.error('Erro ao carregar dados do braço:', error));
-            }
-            
-            function fetchFretboardIntervalsData(root) {
-    fetch(`/api/fretboard-intervals?root=${root}`)
-        .then(response => response.json())
-        .then(data => {
-            fretboardIntervalsData = data;
-            renderIntervals(); // Função específica para renderizar intervalos
-        })
-        .catch(error => console.error('Erro ao carregar dados de intervalos:', error));
-}
-            
-            function updateFretboard() {
-    // Limpar notas existentes
-    document.querySelectorAll('.note').forEach(el => el.remove());
-    
-    // Obter modo atual
-    const mode = displayModeEl.value;
-    const rootNote = rootNoteEl.value;
-    
-    // Atualizar dados de intervalos quando a nota raiz muda
-    if (mode === 'intervals') {
-        // Apenas no modo de intervalos, não quando showNotation === 'intervals'
-        fetchFretboardIntervalsData(rootNote);
-        return; // O renderizador será chamado após o fetch
-    }
-    
-    // Buscar dados de escala ou acorde se necessário
-    if (mode === 'scale') {
-        fetchScaleNotes(rootNote, scaleTypeEl.value);
-    } else if (mode === 'chord') {
-        fetchChordNotes(rootNote, chordTypeEl.value);
-    } else if (mode === 'scale-triads') {
-        fetchScaleTriads(rootNote, scaleTypeEl.value);
-    } else if (mode === 'all-triads') {
-        fetchAllTriads(rootNote);
-    } else {
-        // Modo de todas as notas
-        renderNotes();
-    }
-}
-// Nova função para renderizar intervalos
-function renderIntervals() {
-    const rootNote = rootNoteEl.value;
-    
-    // Para cada corda no braço
-    fretboardIntervalsData.forEach((string, stringIdx) => {
-        // Para cada nota na corda
-        string.forEach((noteData) => {
-            const { note, string: stringNum, fret, interval_name } = noteData;
-            
-            // Encontrar o elemento do traste
-            const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
-            
-            if (fretEl) {
-                // Criar elemento da nota
-                const noteEl = document.createElement('div');
-                
-                // Formatação baseada se é nota raiz ou outro intervalo
-                if (note === rootNote) {
-                    noteEl.className = 'note root';
-                } else {
-                    noteEl.className = `note interval-${interval_name}`;
+            // Construir tríades
+            for (let i = 0; i < scaleNotes.length; i++) {
+                const rootNote = scaleNotes[i];
+                if (i < triadTypes.length) {
+                    const triadType = triadTypes[i];
+                    
+ // Gera notas da tríade
+ const triadNotes = generateChordNotes(rootNote, triadType);
+                    
+                    // Gera dados de intervalos da tríade
+                    const triadIntervals = triadNotes.map(note => {
+                        const noteIdx = NOTES.indexOf(note);
+                        const rootNoteIdx = NOTES.indexOf(rootNote);
+                        const interval = (noteIdx - rootNoteIdx + 12) % 12;
+                        return {
+                            interval: interval,
+                            interval_name: INTERVAL_NAMES[interval],
+                            note: note
+                        };
+                    });
+                    
+                    triads.push({
+                        root: rootNote,
+                        type: triadType,
+                        notes: triadNotes,
+                        intervals: triadIntervals,
+                        degree: i + 1
+                    });
                 }
+            }
+            
+            scaleTriads = triads;
+        }
+        
+        // Gera notas de um acorde
+        function generateChordNotes(root, chordType) {
+            const rootIdx = NOTES.indexOf(root);
+            const intervals = CHORDS[chordType] || CHORDS.major;
+            
+            return intervals.map(interval => {
+                const noteIdx = (rootIdx + interval) % 12;
+                return NOTES[noteIdx];
+            });
+        }
+        
+        // Gera todos os tipos de tríades para uma nota
+        function generateAllTriads(root) {
+            const triadTypes = ['major', 'minor', 'dim', 'aug'];
+            const triads = {};
+            
+            triadTypes.forEach(type => {
+                const notes = generateChordNotes(root, type);
                 
-                // Exibir o nome do intervalo ou a nota dependendo do modo
-                noteEl.textContent = showNotation === 'intervals' ? interval_name : note;
+                // Gera dados de intervalos
+                const intervals = notes.map(note => {
+                    const noteIdx = NOTES.indexOf(note);
+                    const rootIdx = NOTES.indexOf(root);
+                    const interval = (noteIdx - rootIdx + 12) % 12;
+                    return {
+                        interval: interval,
+                        interval_name: INTERVAL_NAMES[interval],
+                        note: note
+                    };
+                });
                 
-                // Adicionar ao traste
-                fretEl.appendChild(noteEl);
-            }
-        });
-    });
-}
+                triads[type] = {
+                    notes: notes,
+                    intervals: intervals
+                };
+            });
             
-            function fetchScaleNotes(root, type) {
-                fetch(`/api/scale?root=${root}&type=${type}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        scaleData = data;
-                        renderNotes();
-                    })
-                    .catch(error => console.error('Erro ao carregar notas da escala:', error));
-            }
+            allTriads = triads;
+        }
+        
+        // Renderiza notas no braço
+        function renderNotes() {
+            const mode = displayModeEl.value;
+            const rootNote = rootNoteEl.value;
             
-            function fetchChordNotes(root, type) {
-                fetch(`/api/chord?root=${root}&type=${type}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        chordData = data;
-                        renderNotes();
-                    })
-                    .catch(error => console.error('Erro ao carregar notas do acorde:', error));
-            }
-            
-            function fetchScaleTriads(root, type) {
-                fetch(`/api/scale-triads?root=${root}&type=${type}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        scaleTriads = data;
-                        renderScaleTriads();
-                    })
-                    .catch(error => console.error('Erro ao carregar tríades da escala:', error));
-            }
-            
-            function fetchAllTriads(root) {
-                fetch(`/api/all-triads?root=${root}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        allTriads = data;
-                        renderAllTriads();
-                    })
-                    .catch(error => console.error('Erro ao carregar todos os tipos de tríades:', error));
-            }
-            
-            function renderNotes() {
-                const mode = displayModeEl.value;
-                const rootNote = rootNoteEl.value;
-                
-                // Para cada corda no braço
-                fretboardData.forEach((string, stringIdx) => {
-                    // Para cada nota na corda
-                    string.forEach((noteData, fretIdx) => {
-                        const { note, string: stringNum, fret } = noteData;
+            // Para cada corda no braço
+            fretboardData.forEach((string, stringIdx) => {
+                // Para cada nota na corda
+                string.forEach((noteData, fretIdx) => {
+                    const { note, string: stringNum, fret } = noteData;
+                    
+                    // Obter dados de intervalo correspondentes
+                    const intervalData = fretboardIntervalsData[stringIdx][fretIdx];
+                    
+                    // Determinar se a nota deve ser mostrada
+                    let showNote = false;
+                    let noteClass = 'note';
+                    let displayText = note; // Texto a ser exibido (nota ou intervalo)
+                    
+                    if (mode === 'notes') {
+                        // Modo de notas - mostrar todas as notas
+                        showNote = true;
+                        if (note === rootNote) {
+                            noteClass += ' root';
+                        }
                         
-                        // Obter dados de intervalo correspondentes
-                        const intervalData = fretboardIntervalsData[stringIdx]?.[fretIdx];
+                        // Se a notação for de intervalos, mostrar o nome do intervalo
+                        if (showNotation === 'intervals') {
+                            displayText = intervalData.interval_name;
+                            noteClass += ` interval-${intervalData.interval_name}`;
+                        }
+                    } else if (mode === 'scale') {
+                        // Mostrar notas da escala
+                        const scaleNotes = scaleData.notes || [];
                         
-                        // Determinar se a nota deve ser mostrada
-                        let showNote = false;
-                        let noteClass = 'note';
-                        let displayText = note; // Texto a ser exibido (nota ou intervalo)
-                        
-                        if (mode === 'notes' || mode === 'intervals') {
-                            // Modo de notas ou intervalos - mostrar todas as notas
+                        if (scaleNotes.includes(note)) {
                             showNote = true;
                             if (note === rootNote) {
                                 noteClass += ' root';
+                            } else {
+                                noteClass += ' scale-note';
                             }
                             
-                            // Se estamos no modo de intervalos, use o nome do intervalo
-                            if (mode === 'intervals' || showNotation === 'intervals') {
-                                if (intervalData) {
-                                    displayText = intervalData.interval_name;
-                                    noteClass += ` interval-${intervalData.interval_name}`;
-                                }
-                            }
-                        } else if (mode === 'scale') {
-                            // Mostrar notas da escala
-                            const scaleNotes = scaleData.notes || [];
-                            
-                            if (scaleNotes.includes(note)) {
-                                showNote = true;
-                                if (note === rootNote) {
-                                    noteClass += ' root';
-                                } else {
-                                    noteClass += ' scale-note';
-                                }
-                                
-                                // Se estamos no modo de intervalos, busque o intervalo
-                                if (showNotation === 'intervals') {
-                                    const interval = scaleData.intervals.find(i => i.note === note);
-                                    if (interval) {
-                                        displayText = interval.interval_name;
-                                        noteClass += ` interval-${interval.interval_name}`;
-                                    }
-                                }
-                            }
-                        } else if (mode === 'chord') {
-                            // Mostrar notas do acorde
-                            const chordNotes = chordData.notes || [];
-                            
-                            if (chordNotes.includes(note)) {
-                                showNote = true;
-                                if (note === rootNote) {
-                                    noteClass += ' root';
-                                } else {
-                                    noteClass += ' chord-note';
-                                }
-                                
-                                // Se estamos no modo de intervalos, busque o intervalo
-                                if (showNotation === 'intervals') {
-                                    const interval = chordData.intervals.find(i => i.note === note);
-                                    if (interval) {
-                                        displayText = interval.interval_name;
-                                        noteClass += ` interval-${interval.interval_name}`;
-                                    }
+                            // Se a notação for de intervalos, busque o intervalo
+                            if (showNotation === 'intervals') {
+                                const interval = scaleData.intervals.find(i => i.note === note);
+                                if (interval) {
+                                    displayText = interval.interval_name;
+                                    noteClass += ` interval-${interval.interval_name}`;
                                 }
                             }
                         }
+                    } else if (mode === 'chord') {
+                        // Mostrar notas do acorde
+                        const chordNotes = chordData.notes || [];
                         
-                        if (showNote) {
-                            // Encontrar o elemento do traste
-                            const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
+                        if (chordNotes.includes(note)) {
+                            showNote = true;
+                            if (note === rootNote) {
+                                noteClass += ' root';
+                            } else {
+                                noteClass += ' chord-note';
+                            }
                             
-                            if (fretEl) {
-                                // Criar elemento da nota
-                                const noteEl = document.createElement('div');
-                                noteEl.className = noteClass;
-                                noteEl.textContent = displayText;
-                                
-                                // Adicionar a nota ao traste
-                                fretEl.appendChild(noteEl);
+                            // Se a notação for de intervalos, busque o intervalo
+                            if (showNotation === 'intervals') {
+                                const interval = chordData.intervals.find(i => i.note === note);
+                                if (interval) {
+                                    displayText = interval.interval_name;
+                                    noteClass += ` interval-${interval.interval_name}`;
+                                }
                             }
                         }
-                    });
-                });
-            }function renderScaleTriads() {
-                // Primeiro exibe a escala
-                fetchScaleNotes(rootNoteEl.value, scaleTypeEl.value);
-                
-                // Renderiza a lista de tríades
-                const triadsListEl = document.getElementById('triads-list');
-                triadsListEl.innerHTML = '';
-                
-                scaleTriads.forEach((triad, index) => {
-                    const triadEl = document.createElement('div');
-                    triadEl.className = 'legend-item';
-                    
-                    // Cria a badge colorida para o grau da escala
-                    const degreeBadge = document.createElement('span');
-                    degreeBadge.className = `triad-badge triad-${getRomanNumeral(triad.degree).toLowerCase()}`;
-                    degreeBadge.textContent = getRomanNumeral(triad.degree);
-                    
-                    // Cria o texto de descrição da tríade
-                    const descriptionEl = document.createElement('span');
-                    let chordName = triad.root;
-                    switch(triad.type) {
-                        case 'major': chordName += ''; break;
-                        case 'minor': chordName += 'm'; break;
-                        case 'dim': chordName += 'dim'; break;
-                        case 'aug': chordName += 'aug'; break;
-                        default: chordName += ' ' + triad.type; break;
                     }
                     
-                    const noteNames = showNotation === 'notes' ? 
-                        triad.notes.join(', ') : 
-                        triad.intervals.map(i => i.interval_name).join(', ');
-                    
-                    descriptionEl.textContent = `${chordName} (${noteNames})`;
-                    
-                    // Cria um botão para mostrar a tríade no braço
-                    const showButton = document.createElement('button');
-                    showButton.textContent = 'Mostrar';
-                    showButton.style.marginLeft = '10px';
-                    showButton.addEventListener('click', () => {
-                        showTriadOnFretboard(triad, index);
-                    });
-                    
-                    // Adiciona os elementos ao item de tríade
-                    triadEl.appendChild(degreeBadge);
-                    triadEl.appendChild(descriptionEl);
-                    triadEl.appendChild(showButton);
-                    
-                    // Adiciona o item à lista
-                    triadsListEl.appendChild(triadEl);
-                });
-            }
-            
-            function renderAllTriads() {
-                // Renderiza a lista de todos os tipos de tríades
-                const allTriadsListEl = document.getElementById('all-triads-list');
-                allTriadsListEl.innerHTML = '';
-                
-                const rootNote = rootNoteEl.value;
-                const triadTypes = ['major', 'minor', 'dim', 'aug'];
-                const triadNames = {
-                    'major': 'Maior',
-                    'minor': 'Menor',
-                    'dim': 'Diminuta',
-                    'aug': 'Aumentada'
-                };
-                
-                triadTypes.forEach(type => {
-                    const triadEl = document.createElement('div');
-                    triadEl.className = 'legend-item';
-                    
-                    // Cria a badge colorida para o tipo de tríade
-                    const typeBadge = document.createElement('span');
-                    typeBadge.className = `triad-badge triad-${type}`;
-                    typeBadge.textContent = triadNames[type];
-                    
-                    // Cria o texto de descrição da tríade
-                    const descriptionEl = document.createElement('span');
-                    const triadData = allTriads[type];
-                    
-                    let chordName = rootNote;
-                    switch(type) {
-                        case 'major': chordName += ''; break;
-                        case 'minor': chordName += 'm'; break;
-                        case 'dim': chordName += 'dim'; break;
-                        case 'aug': chordName += 'aug'; break;
-                        default: chordName += ' ' + type; break;
+                    if (showNote) {
+                        // Encontrar o elemento do traste
+                        const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
+                        
+                        if (fretEl) {
+                            // Criar elemento da nota
+                            const noteEl = document.createElement('div');
+                            noteEl.className = noteClass;
+                            noteEl.textContent = displayText;
+                            
+                            // Adicionar a nota ao traste
+                            fretEl.appendChild(noteEl);
+                        }
                     }
-                    
-                    const noteNames = showNotation === 'notes' ? 
-                        triadData.notes.join(', ') : 
-                        triadData.intervals.map(i => i.interval_name).join(', ');
-                    
-                    descriptionEl.textContent = `${chordName} (${noteNames})`;
-                    
-                    // Cria um botão para mostrar a tríade no braço
-                    const showButton = document.createElement('button');
-                    showButton.textContent = 'Mostrar';
-                    showButton.style.marginLeft = '10px';
-                    showButton.addEventListener('click', () => {
-                        showAllTriadType(type);
-                    });
-                    
-                    // Adiciona os elementos ao item de tríade
-                    triadEl.appendChild(typeBadge);
-                    triadEl.appendChild(descriptionEl);
-                    triadEl.appendChild(showButton);
-                    
-                    // Adiciona o item à lista
-                    allTriadsListEl.appendChild(triadEl);
                 });
-                
-                // Mostra a tríade maior por padrão
-                showAllTriadType('major');
-            }
+            });
+        }
+        
+        // Renderiza intervalos
+        function renderIntervals() {
+            const rootNote = rootNoteEl.value;
             
-            function showTriadOnFretboard(triad, triadIndex) {
-                // Remove todas as notas existentes
-                document.querySelectorAll('.note').forEach(el => el.remove());
-                
-                // Guarda o índice da tríade atual
-                currentTriadIndex = triadIndex;
-                
-                // Para cada corda no braço
-                fretboardData.forEach(string => {
-                    // Para cada nota na corda
-                    string.forEach(noteData => {
-                        const { note, string: stringNum, fret } = noteData;
+            // Para cada corda no braço
+            fretboardIntervalsData.forEach(string => {
+                // Para cada nota na corda
+                string.forEach(noteData => {
+                    const { note, string: stringNum, fret, interval_name } = noteData;
+                    
+                    // Encontrar o elemento do traste
+                    const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
+                    
+                    if (fretEl) {
+                        // Criar elemento da nota
+                        const noteEl = document.createElement('div');
                         
-                        // Verifica se a nota faz parte da tríade
-                        if (triad.notes.includes(note)) {
-                            // Encontra o elemento do traste
-                            const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
-                            
-                            if (fretEl) {
-                                // Cria elemento da nota
-                                const noteEl = document.createElement('div');
-                                
-                                // Determina a classe e o texto a exibir
-                                let displayText = note;
-                                
-                                if (note === triad.root) {
-                                    noteEl.className = `note triad-note`;
-                                } else {
-                                    noteEl.className = `note chord-note`;
-                                }
-                                
-                                // Se estamos no modo de intervalos, exiba o nome do intervalo
-                                if (showNotation === 'intervals') {
-                                    const interval = triad.intervals.find(i => i.note === note);
-                                    if (interval) {
-                                        displayText = interval.interval_name;
-                                        noteEl.className += ` interval-${interval.interval_name}`;
-                                    }
-                                }
-                                
-                                noteEl.textContent = displayText;
-                                
-                                // Adiciona a nota ao traste
-                                fretEl.appendChild(noteEl);
-                            }
+                        // Formatação baseada se é nota raiz ou outro intervalo
+                        if (note === rootNote) {
+                            noteEl.className = 'note root';
+                        } else {
+                            noteEl.className = `note interval-${interval_name}`;
                         }
-                    });
-                });
-            }
-            
-            function showAllTriadType(triadType) {
-                // Remove todas as notas existentes
-                document.querySelectorAll('.note').forEach(el => el.remove());
-                
-                // Guarda o tipo de tríade atual
-                currentTriadType = triadType;
-                
-                // Obtém as notas da tríade
-                const triadData = allTriads[triadType];
-                const rootNote = rootNoteEl.value;
-                
-                // Para cada corda no braço
-                fretboardData.forEach(string => {
-                    // Para cada nota na corda
-                    string.forEach(noteData => {
-                        const { note, string: stringNum, fret } = noteData;
                         
-                        // Verifica se a nota faz parte da tríade
-                        if (triadData.notes.includes(note)) {
-                            // Encontra o elemento do traste
-                            const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
-                            
-                            if (fretEl) {
-                                // Cria elemento da nota
-                                const noteEl = document.createElement('div');
-                                
-                                // Determina a classe e o texto a exibir
-                                let displayText = note;
-                                
-                                if (note === rootNote) {
-                                    noteEl.className = `note triad-note`;
-                                } else {
-                                    noteEl.className = `note triad-${triadType}`;
-                                }
-                                
-                                // Se estamos no modo de intervalos, exiba o nome do intervalo
-                                if (showNotation === 'intervals') {
-                                    const interval = triadData.intervals.find(i => i.note === note);
-                                    if (interval) {
-                                        displayText = interval.interval_name;
-                                        noteEl.className += ` interval-${interval.interval_name}`;
-                                    }
-                                }
-                                
-                                noteEl.textContent = displayText;
-                                
-                                // Adiciona a nota ao traste
-                                fretEl.appendChild(noteEl);
-                            }
-                        }
-                    });
+                        // Exibir o nome do intervalo ou a nota dependendo do modo
+                        noteEl.textContent = showNotation === 'intervals' ? interval_name : note;
+                        
+                        // Adicionar ao traste
+                        fretEl.appendChild(noteEl);
+                    }
                 });
-            }
+            });
+        }
+// Renderiza tríades da escala
+function renderScaleTriads() {
+            // Primeiro exibe a escala
+            renderNotes();
             
-            // Função para converter número para numeral romano
-            function getRomanNumeral(num) {
-                const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-                return romanNumerals[num - 1] || num.toString();
-            }
-        });
+            // Renderiza a lista de tríades
+            const triadsListEl = document.getElementById('triads-list');
+            triadsListEl.innerHTML = '';
+            
+            scaleTriads.forEach((triad, index) => {
+                const triadEl = document.createElement('div');
+                triadEl.className = 'legend-item';
+                
+                // Cria a badge colorida para o grau da escala
+                const degreeBadge = document.createElement('span');
+                degreeBadge.className = `triad-badge triad-${getRomanNumeral(triad.degree).toLowerCase()}`;
+                degreeBadge.textContent = getRomanNumeral(triad.degree);
+                
+                // Cria o texto de descrição da tríade
+                const descriptionEl = document.createElement('span');
+                let chordName = triad.root;
+                switch(triad.type) {
+                    case 'major': chordName += ''; break;
+                    case 'minor': chordName += 'm'; break;
+                    case 'dim': chordName += 'dim'; break;
+                    case 'aug': chordName += 'aug'; break;
+                    default: chordName += ' ' + triad.type; break;
+                }
+                
+                const noteNames = showNotation === 'notes' ? 
+                    triad.notes.join(', ') : 
+                    triad.intervals.map(i => i.interval_name).join(', ');
+                
+                descriptionEl.textContent = `${chordName} (${noteNames})`;
+                
+                // Cria um botão para mostrar a tríade no braço
+                const showButton = document.createElement('button');
+                showButton.textContent = 'Mostrar';
+                showButton.style.marginLeft = '10px';
+                showButton.addEventListener('click', () => {
+                    showTriadOnFretboard(triad, index);
+                });
+                
+                // Adiciona os elementos ao item de tríade
+                triadEl.appendChild(degreeBadge);
+                triadEl.appendChild(descriptionEl);
+                triadEl.appendChild(showButton);
+                
+                // Adiciona o item à lista
+                triadsListEl.appendChild(triadEl);
+            });
+        }
+        
+        // Renderiza todos os tipos de tríades
+        function renderAllTriads() {
+            // Renderiza a lista de todos os tipos de tríades
+            const allTriadsListEl = document.getElementById('all-triads-list');
+            allTriadsListEl.innerHTML = '';
+            
+            const rootNote = rootNoteEl.value;
+            const triadTypes = ['major', 'minor', 'dim', 'aug'];
+            const triadNames = {
+                'major': 'Maior',
+                'minor': 'Menor',
+                'dim': 'Diminuta',
+                'aug': 'Aumentada'
+            };
+            
+            triadTypes.forEach(type => {
+                const triadEl = document.createElement('div');
+                triadEl.className = 'legend-item';
+                
+                // Cria a badge colorida para o tipo de tríade
+                const typeBadge = document.createElement('span');
+                typeBadge.className = `triad-badge triad-${type}`;
+                typeBadge.textContent = triadNames[type];
+                
+                // Cria o texto de descrição da tríade
+                const descriptionEl = document.createElement('span');
+                const triadData = allTriads[type];
+                
+                let chordName = rootNote;
+                switch(type) {
+                    case 'major': chordName += ''; break;
+                    case 'minor': chordName += 'm'; break;
+                    case 'dim': chordName += 'dim'; break;
+                    case 'aug': chordName += 'aug'; break;
+                    default: chordName += ' ' + type; break;
+                }
+                
+                const noteNames = showNotation === 'notes' ? 
+                    triadData.notes.join(', ') : 
+                    triadData.intervals.map(i => i.interval_name).join(', ');
+                
+                descriptionEl.textContent = `${chordName} (${noteNames})`;
+                
+                // Cria um botão para mostrar a tríade no braço
+                const showButton = document.createElement('button');
+                showButton.textContent = 'Mostrar';
+                showButton.style.marginLeft = '10px';
+                showButton.addEventListener('click', () => {
+                    showAllTriadType(type);
+                });
+                
+                // Adiciona os elementos ao item de tríade
+                triadEl.appendChild(typeBadge);
+                triadEl.appendChild(descriptionEl);
+                triadEl.appendChild(showButton);
+                
+                // Adiciona o item à lista
+                allTriadsListEl.appendChild(triadEl);
+            });
+            
+            // Mostra a tríade maior por padrão
+            showAllTriadType('major');
+        }
+        
+        // Exibe uma tríade da escala no braço
+        function showTriadOnFretboard(triad, triadIndex) {
+            // Remove todas as notas existentes
+            document.querySelectorAll('.note').forEach(el => el.remove());
+            
+            // Guarda o índice da tríade atual
+            currentTriadIndex = triadIndex;
+            
+            // Para cada corda no braço
+            fretboardData.forEach(string => {
+                // Para cada nota na corda
+                string.forEach(noteData => {
+                    const { note, string: stringNum, fret } = noteData;
+                    
+                    // Verifica se a nota faz parte da tríade
+                    if (triad.notes.includes(note)) {
+                        // Encontra o elemento do traste
+                        const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
+                        
+                        if (fretEl) {
+                            // Cria elemento da nota
+                            const noteEl = document.createElement('div');
+                            
+                            // Determina a classe e o texto a exibir
+                            let displayText = note;
+                            
+                            if (note === triad.root) {
+                                noteEl.className = `note triad-note`;
+                            } else {
+                                noteEl.className = `note chord-note`;
+                            }
+                            
+                            // Se estamos no modo de intervalos, exiba o nome do intervalo
+                            if (showNotation === 'intervals') {
+                                const interval = triad.intervals.find(i => i.note === note);
+                                if (interval) {
+                                    displayText = interval.interval_name;
+                                    noteEl.className += ` interval-${interval.interval_name}`;
+                                }
+                            }
+                            
+                            noteEl.textContent = displayText;
+                            
+                            // Adiciona a nota ao traste
+                            fretEl.appendChild(noteEl);
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Exibe um tipo de tríade no braço
+        function showAllTriadType(triadType) {
+            // Remove todas as notas existentes
+            document.querySelectorAll('.note').forEach(el => el.remove());
+            
+            // Guarda o tipo de tríade atual
+            currentTriadType = triadType;
+            
+            // Obtém as notas da tríade
+            const triadData = allTriads[triadType];
+            const rootNote = rootNoteEl.value;
+            
+            // Para cada corda no braço
+            fretboardData.forEach(string => {
+                // Para cada nota na corda
+                string.forEach(noteData => {
+                    const { note, string: stringNum, fret } = noteData;
+                    
+                    // Verifica se a nota faz parte da tríade
+                    if (triadData.notes.includes(note)) {
+                        // Encontra o elemento do traste
+                        const fretEl = document.querySelector(`.fret[data-string="${stringNum}"][data-fret="${fret}"]`);
+                        
+                        if (fretEl) {
+                            // Cria elemento da nota
+                            const noteEl = document.createElement('div');
+                            
+                            // Determina a classe e o texto a exibir
+                            let displayText = note;
+                            
+                            if (note === rootNote) {
+                                noteEl.className = `note triad-note`;
+                            } else {
+                                noteEl.className = `note triad-${triadType}`;
+                            }
+                            
+                            // Se estamos no modo de intervalos, exiba o nome do intervalo
+                            if (showNotation === 'intervals') {
+                                const interval = triadData.intervals.find(i => i.note === note);
+                                if (interval) {
+                                    displayText = interval.interval_name;
+                                    noteEl.className += ` interval-${interval.interval_name}`;
+                                }
+                            }
+                            
+                            noteEl.textContent = displayText;
+                            
+                            // Adiciona a nota ao traste
+                            fretEl.appendChild(noteEl);
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Função para converter número para numeral romano
+        function getRomanNumeral(num) {
+            const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+            return romanNumerals[num - 1] || num.toString();
+        }
+        
+        // Inicializa a aplicação
+        init();
     </script>
 </body>
 </html>

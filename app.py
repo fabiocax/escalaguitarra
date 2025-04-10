@@ -2,6 +2,7 @@
 Guitar Fretboard Visualizer - Aplicativo web em Python para visualizar notas no braço da guitarra
 """
 from flask import Flask, render_template, request, jsonify
+import os
 
 app = Flask(__name__)
 
@@ -280,4 +281,7 @@ def all_triads():
     return jsonify(get_all_triads(root))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Obter a porta definida pelo Heroku ou usar 5000 como padrão
+    port = int(os.environ.get("PORT", 5000))
+    # Definir host como 0.0.0.0 para Heroku
+    app.run(host='0.0.0.0', port=port)
